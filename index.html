@@ -1,1 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Procurement Price Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;font-size:13px;background:#f0f2f5;color:#222}
 
+/* ── Login ── */
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f0f2f5}
+.login-card{background:#fff;border-radius:14px;padding:36px 32px;width:340px;border:1px solid #e0e0e0;box-shadow:0 4px 24px rgba(0,0,0,.07)}
+.login-logo{text-align:center;margin-bottom:24px}
+.login-logo div{font-size:22px;font-weight:700;color:#222;margin-top:10px}
+.login-logo span{font-size:13px;color:#888}
+.login-card label{display:block;font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px}
+.login-card input{width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;margin-bottom:14px}
+.login-card input:focus{border-color:#378ADD}
+.login-btn{width:100%;padding:11px;background:#378ADD;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px}
+.login-btn:hover{background:#2a6db5}
+.login-err{color:#D85A30;font-size:12px;text-align:center;margin-top:10px;min-height:18px}
+
+/* ── Dashboard ── */
+#dashboard-screen{display:none}
+.page{max-width:1200px;margin:0 auto;padding:16px}
+.topbar{background:#fff;border-bottom:1px solid #e0e0e0;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;margin-bottom:0}
+.topbar-title{font-size:15px;font-weight:600;color:#222}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.user-badge{font-size:12px;color:#555;background:#f0f2f5;padding:5px 12px;border-radius:20px}
+.logout-btn{font-size:12px;color:#888;background:none;border:1px solid #ddd;border-radius:6px;padding:5px 12px;cursor:pointer}
+.logout-btn:hover{background:#f5f5f5}
+.filters{background:#fff;padding:14px 18px;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;border-bottom:1px solid #e0e0e0}
+.filter-group{display:flex;flex-direction:column;gap:4px;min-width:160px;flex:1}
+.filter-label{font-size:11px;color:#888;font-weight:500;text-transform:uppercase;letter-spacing:.04em}
+select{padding:7px 10px;border:1px solid #ddd;border-radius:6px;background:#fff;font-size:12px;outline:none;color:#222;width:100%}
+.date-range{display:flex;gap:6px;align-items:center}
+.date-range input[type=month]{padding:7px 10px;border:1px solid #ddd;border-radius:6px;font-size:12px;outline:none;width:120px}
+.date-range span{color:#888}
+.grid-top{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.card{background:#fff;border-radius:10px;padding:16px;border:1px solid #e0e0e0}
+.card-title{font-size:12px;font-weight:600;color:#444;margin-bottom:12px}
+.chart-wrap{position:relative;width:100%;height:280px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;padding:7px 10px;font-weight:600;color:#555;border-bottom:2px solid #eee;background:#fafafa;white-space:nowrap}
+th.num{text-align:right}
+td{padding:7px 10px;border-bottom:1px solid #f0f0f0;color:#333}
+td.num{text-align:right;font-weight:500}
+tr.total-row td{font-weight:700;background:#f8f8f8;border-top:2px solid #ddd}
+.up{color:#D85A30}
+.down{color:#1D9E75}
+.loading{text-align:center;padding:4rem;color:#888;font-size:14px}
+.error{text-align:center;padding:3rem;color:#D85A30}
+.refresh-btn{padding:7px 14px;border:1px solid #ddd;border-radius:6px;background:#fff;font-size:12px;cursor:pointer;color:#555}
+.refresh-btn:hover{background:#f5f5f5}
+@media(max-width:700px){.grid-top{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+        <rect width="48" height="48" rx="12" fill="#378ADD"/>
+        <path d="M14 34V20l10-8 10 8v14H28v-8h-8v8z" fill="#fff"/>
+      </svg>
+      <div>Procurement Dashboard</div>
+      <span>Fresh Electric — Spare Parts</span>
+    </div>
+    <label>Username</label>
+    <input type="text" id="inp-user" placeholder="Enter username" onkeydown="if(event.key==='Enter')doLogin()">
+    <label>Password</label>
+    <input type="password" id="inp-pass" placeholder="Enter password" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" onclick="doLogin()">Sign In</button>
+    <div class="login-err" id="login-err"></div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard-screen">
+  <div class="topbar">
+    <div class="topbar-title">Procurement Price Dashboard</div>
+    <div class="topbar-right">
+      <div class="user-badge" id="user-badge">giovanni</div>
+      <button class="logout-btn" onclick="doLogout()">Sign out</button>
+      <button class="refresh-btn" onclick="loadAll()">↺ Refresh</button>
+    </div>
+  </div>
+
+  <div class="filters">
+    <div class="filter-group">
+      <div class="filter-label">Supplier / Supplying Plant</div>
+      <select id="f-supplier" onchange="applyFilters()"><option value="">All</option></select>
+    </div>
+    <div class="filter-group">
+      <div class="filter-label">Date Range</div>
+      <div class="date-range">
+        <input type="month" id="f-date-from" onchange="applyFilters()">
+        <span>→</span>
+        <input type="month" id="f-date-to" onchange="applyFilters()">
+      </div>
+    </div>
+    <div class="filter-group">
+      <div class="filter-label">Category</div>
+      <select id="f-category" onchange="applyFilters()"><option value="">All</option></select>
+    </div>
+  </div>
+
+  <div class="page">
+    <div id="root"><div class="loading">Loading data from Google Sheets...</div></div>
+  </div>
+</div>
+
+<script>
+// ── Auth ──────────────────────────────────────────────────────────────────────
+const USERS={giovanni:"giovannihani"};
+
+function doLogin(){
+  const u=document.getElementById("inp-user").value.trim();
+  const p=document.getElementById("inp-pass").value;
+  if(USERS[u]&&USERS[u]===p){
+    document.getElementById("login-screen").style.display="none";
+    document.getElementById("dashboard-screen").style.display="block";
+    document.getElementById("user-badge").textContent=u;
+    sessionStorage.setItem("loggedIn",u);
+    loadAll();
+  }else{
+    document.getElementById("login-err").textContent="Incorrect username or password.";
+  }
+}
+function doLogout(){
+  sessionStorage.removeItem("loggedIn");
+  document.getElementById("dashboard-screen").style.display="none";
+  document.getElementById("login-screen").style.display="flex";
+  document.getElementById("inp-user").value="";
+  document.getElementById("inp-pass").value="";
+  document.getElementById("login-err").textContent="";
+}
+// Auto-login if session exists
+if(sessionStorage.getItem("loggedIn")){
+  document.getElementById("login-screen").style.display="none";
+  document.getElementById("dashboard-screen").style.display="block";
+  document.getElementById("user-badge").textContent=sessionStorage.getItem("loggedIn");
+}
+
+// ── Data ──────────────────────────────────────────────────────────────────────
+const SHEET_IDS={
+  prices:"14UQ7jkJ8Iwf164nVpofCJBzFGDjbJRou",
+  categories:"1ieNsiHChGmlhxfmHzJxo49armHCC1NEe",
+};
+const SUP_COLORS=["#4472C4","#ED7D31","#A5A5A5","#FFC000","#5B9BD5","#70AD47"];
+
+function toYM(v){
+  if(!v)return null;
+  let d;
+  if(typeof v==="number")d=new Date(Math.round((v-25569)*86400*1000));
+  else d=new Date(v);
+  if(isNaN(d))return null;
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+}
+function monthLabel(ym){
+  if(!ym)return"";
+  const[y,m]=ym.split("-");
+  return new Date(+y,+m-1,1).toLocaleString("en",{month:"short",year:"numeric"});
+}
+function shortSup(s){
+  if(!s)return"—";
+  const p=s.split("   ");
+  return p.length>1?p[1].trim():s.trim();
+}
+async function fetchSheet(id){
+  const url=`https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:json`;
+  const res=await fetch(url);
+  const txt=await res.text();
+  const json=JSON.parse(txt.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
+  const cols=json.table.cols.map(c=>c.label);
+  return json.table.rows.map(r=>{
+    const obj={};
+    cols.forEach((c,i)=>{obj[c]=r.c[i]?r.c[i].v:null;});
+    return obj;
+  });
+}
+
+let RAW={prices:[],catMap:{}};
+let FILTERED=[];
+
+async function loadAll(){
+  document.getElementById("root").innerHTML=`<div class="loading">Loading data from Google Sheets...</div>`;
+  try{
+    const[prices,cats]=await Promise.all([fetchSheet(SHEET_IDS.prices),fetchSheet(SHEET_IDS.categories)]);
+    RAW.prices=prices.map(r=>({
+      material:String(r["Material"]??"").trim(),
+      ym:toYM(r["Date "]??r["Date"]),
+      price:parseFloat(r["Price"])||0,
+      supplier:String(r["Supplier"]??"").trim(),
+    })).filter(r=>r.material&&r.ym&&r.price>0);
+
+    RAW.catMap={};
+    cats.forEach(r=>{
+      const m=String(r["Material"]??"").trim();
+      if(m)RAW.catMap[m]={category:String(r["Category"]??"").trim(),desc:String(r["Material Description"]??"").trim()};
+    });
+
+    const suppliers=[...new Set(RAW.prices.map(r=>r.supplier))].sort();
+    const categories=[...new Set(Object.values(RAW.catMap).map(v=>v.category))].filter(Boolean).sort();
+    const months=RAW.prices.map(r=>r.ym).filter(Boolean).sort();
+
+    document.getElementById("f-supplier").innerHTML=`<option value="">All</option>`+suppliers.map(s=>`<option value="${s}">${shortSup(s)}</option>`).join("");
+    document.getElementById("f-category").innerHTML=`<option value="">All</option>`+categories.map(c=>`<option value="${c}">${c}</option>`).join("");
+    document.getElementById("f-date-from").value=months[0]||"";
+    document.getElementById("f-date-to").value=months[months.length-1]||"";
+    applyFilters();
+  }catch(e){
+    document.getElementById("root").innerHTML=`<div class="error">
+      <div style="font-size:15px;margin-bottom:8px">Failed to load data</div>
+      <div style="font-size:12px;color:#888;margin-bottom:12px">${e.message}</div>
+      <button class="refresh-btn" onclick="loadAll()">Retry</button>
+    </div>`;
+  }
+}
+
+function applyFilters(){
+  const sup=document.getElementById("f-supplier").value;
+  const cat=document.getElementById("f-category").value;
+  const from=document.getElementById("f-date-from").value;
+  const to=document.getElementById("f-date-to").value;
+  FILTERED=RAW.prices.filter(r=>{
+    if(sup&&r.supplier!==sup)return false;
+    if(cat&&RAW.catMap[r.material]?.category!==cat)return false;
+    if(from&&r.ym<from)return false;
+    if(to&&r.ym>to)return false;
+    return true;
+  });
+  renderDashboard();
+}
+
+function renderDashboard(){
+  if(!FILTERED.length){
+    document.getElementById("root").innerHTML=`<div class="loading">No data for selected filters.</div>`;
+    return;
+  }
+  const allMonths=[...new Set(FILTERED.map(r=>r.ym))].sort();
+  const suppliers=[...new Set(FILTERED.map(r=>r.supplier))].sort();
+  const allMaterials=[...new Set(FILTERED.map(r=>r.material))].sort();
+
+  const lineDatasets=suppliers.map((sup,i)=>{
+    const bm={};
+    FILTERED.filter(r=>r.supplier===sup).forEach(r=>{
+      if(!bm[r.ym])bm[r.ym]=[];
+      bm[r.ym].push(r.price);
+    });
+    return{
+      label:shortSup(sup),
+      data:allMonths.map(m=>{const a=bm[m];return a?+(a.reduce((s,v)=>s+v,0)/a.length).toFixed(4):null;}),
+      borderColor:SUP_COLORS[i%SUP_COLORS.length],
+      backgroundColor:SUP_COLORS[i%SUP_COLORS.length]+"33",
+      tension:0.3,spanGaps:true,pointRadius:4,fill:true,
+    };
+  });
+
+  const rightRows=allMaterials.map(mat=>{
+    const desc=RAW.catMap[mat]?.desc||"";
+    const sp={};
+    FILTERED.filter(r=>r.material===mat).forEach(r=>{
+      if(!sp[r.supplier]||r.ym>sp[r.supplier].ym)sp[r.supplier]={price:r.price,ym:r.ym};
+    });
+    return{mat,desc,sp};
+  }).filter(r=>Object.keys(r.sp).length>0);
+
+  const curM=allMonths[allMonths.length-1];
+  const preM=allMonths[allMonths.length-2]||null;
+  const bottomRows=allMaterials.map(mat=>{
+    const desc=RAW.catMap[mat]?.desc||"";
+    const cur=FILTERED.filter(r=>r.material===mat&&r.ym===curM);
+    const pre=FILTERED.filter(r=>r.material===mat&&r.ym===preM);
+    if(!cur.length)return null;
+    const cAvg=cur.reduce((s,r)=>s+r.price,0)/cur.length;
+    const pAvg=pre.length?pre.reduce((s,r)=>s+r.price,0)/pre.length:null;
+    const diff=pAvg!==null?cAvg-pAvg:null;
+    const pct=pAvg?((cAvg-pAvg)/pAvg)*100:null;
+    return{mat,desc,cAvg,pAvg,diff,pct};
+  }).filter(Boolean);
+
+  const tCur=bottomRows.reduce((s,r)=>s+r.cAvg,0)/(bottomRows.length||1);
+  const tPre=bottomRows.filter(r=>r.pAvg!==null).reduce((s,r)=>s+r.pAvg,0)/(bottomRows.filter(r=>r.pAvg!==null).length||1);
+  const tDiff=tCur-tPre;
+  const tPct=tPre?((tCur-tPre)/tPre)*100:null;
+
+  document.getElementById("root").innerHTML=`
+    <div class="grid-top">
+      <div class="card">
+        <div class="card-title">Sum of Price by Month and Supplier</div>
+        <div class="chart-wrap"><canvas id="lineChart" role="img" aria-label="Price trend"></canvas></div>
+      </div>
+      <div class="card" style="overflow-x:auto">
+        <div class="card-title">Price by material and supplier (latest)</div>
+        <table>
+          <thead><tr>
+            <th>Material</th>
+            ${suppliers.map(s=>`<th class="num">${shortSup(s)}</th>`).join("")}
+          </tr></thead>
+          <tbody>
+            ${rightRows.slice(0,15).map(r=>`<tr>
+              <td><div style="font-weight:500">${r.mat}</div><div style="font-size:11px;color:#888">${r.desc}</div></td>
+              ${suppliers.map(s=>`<td class="num">${r.sp[s]?r.sp[s].price.toFixed(2):"—"}</td>`).join("")}
+            </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card" style="overflow-x:auto">
+      <div class="card-title">Current month (${monthLabel(curM)}) vs Previous month (${monthLabel(preM)||"—"})</div>
+      <table>
+        <thead><tr>
+          <th>Material</th>
+          <th>Description</th>
+          <th class="num">Current Month</th>
+          <th class="num">Previous Month</th>
+          <th class="num">Price Difference</th>
+          <th class="num">Price Change %</th>
+        </tr></thead>
+        <tbody>
+          ${bottomRows.map(r=>{
+            const cls=r.diff===null?"":r.diff>0?"up":"down";
+            const arrow=r.diff===null?"":r.diff>0?"▲ ":"▼ ";
+            return`<tr>
+              <td style="font-weight:500">${r.mat}</td>
+              <td style="color:#666">${r.desc}</td>
+              <td class="num">${r.cAvg.toFixed(2)}</td>
+              <td class="num">${r.pAvg!==null?r.pAvg.toFixed(2):"—"}</td>
+              <td class="num ${cls}">${r.diff!==null?(r.diff>=0?"+":"")+r.diff.toFixed(2):"—"}</td>
+              <td class="num ${cls}">${r.pct!==null?arrow+(r.pct>=0?"+":"")+r.pct.toFixed(2)+"%":"—"}</td>
+            </tr>`;
+          }).join("")}
+          <tr class="total-row">
+            <td colspan="2">Average</td>
+            <td class="num">${tCur.toFixed(2)}</td>
+            <td class="num">${tPre.toFixed(2)}</td>
+            <td class="num ${tDiff>0?"up":"down"}">${(tDiff>=0?"+":"")+tDiff.toFixed(2)}</td>
+            <td class="num ${tDiff>0?"up":"down"}">${tPct!==null?(tDiff>=0?"▲ +":"▼ ")+tPct.toFixed(2)+"%":"—"}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  setTimeout(()=>{
+    const ctx=document.getElementById("lineChart");
+    if(!ctx)return;
+    const ex=Chart.getChart(ctx);if(ex)ex.destroy();
+    new Chart(ctx,{type:"line",data:{labels:allMonths.map(monthLabel),datasets:lineDatasets},options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:"bottom",labels:{boxWidth:12,font:{size:11}}}},
+      scales:{
+        x:{ticks:{autoSkip:false,maxRotation:45,font:{size:10}}},
+        y:{ticks:{callback:v=>v.toFixed(2),font:{size:10}}},
+      },
+    }});
+  },50);
+}
+
+window.loadAll=loadAll;
+window.applyFilters=applyFilters;
+window.doLogin=doLogin;
+window.doLogout=doLogout;
+
+// Auto-load if already logged in
+if(sessionStorage.getItem("loggedIn")){loadAll();}
+</script>
+</body>
+</html>
