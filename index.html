@@ -174,9 +174,27 @@ const COLORS=["#4472C4","#ED7D31","#70AD47","#FFC000","#5B9BD5","#A5A5A5","#FF6B
 function toYM(v){
   if(!v)return null;
   let d;
-  if(typeof v==="number")d=new Date(Math.round((v-25569)*86400*1000));
-  else d=new Date(v);
-  if(isNaN(d))return null;
+  if(typeof v==="number"){
+    // Excel serial number
+    d=new Date(Math.round((v-25569)*86400*1000));
+  } else if(typeof v==="string"){
+    // Handle M/D/YYYY or MM/DD/YYYY or YYYY-MM-DD
+    if(v.includes("/")){
+      const parts=v.split("/");
+      if(parts.length===3){
+        // M/D/YYYY format
+        const month=parts[0].padStart(2,"0");
+        const day=parts[1].padStart(2,"0");
+        const year=parts[2].length===2?"20"+parts[2]:parts[2];
+        d=new Date(`${year}-${month}-${day}`);
+      }
+    } else {
+      d=new Date(v);
+    }
+  } else {
+    d=new Date(v);
+  }
+  if(!d||isNaN(d))return null;
   return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
 }
 function mlabel(ym){
