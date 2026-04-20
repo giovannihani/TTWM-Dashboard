@@ -173,29 +173,41 @@ const COLORS=["#4472C4","#ED7D31","#70AD47","#FFC000","#5B9BD5","#A5A5A5","#FF6B
 
 function toYM(v){
   if(!v)return null;
-  let d;
-  if(typeof v==="number"){
-    // Excel serial number
-    d=new Date(Math.round((v-25569)*86400*1000));
-  } else if(typeof v==="string"){
-    // Handle M/D/YYYY or MM/DD/YYYY or YYYY-MM-DD
-    if(v.includes("/")){
-      const parts=v.split("/");
-      if(parts.length===3){
-        // M/D/YYYY format
-        const month=parts[0].padStart(2,"0");
-        const day=parts[1].padStart(2,"0");
-        const year=parts[2].length===2?"20"+parts[2]:parts[2];
-        d=new Date(`${year}-${month}-${day}`);
+  try{
+    // GViz Date(year,month,day) format
+    if(typeof v==="string"){
+      const gviz=v.match(/Date\((\d+),(\d+),(\d+)\)/);
+      if(gviz) return gviz[1]+"-"+String(+gviz[2]+1).padStart(2,"0");
+
+      // Jan-2025 or Jan 2025
+      const months={jan:"01",feb:"02",mar:"03",apr:"04",may:"05",jun:"06",
+                    jul:"07",aug:"08",sep:"09",oct:"10",nov:"11",dec:"12"};
+      const m1=v.match(/^([A-Za-z]{3})[-\s](\d{4})$/);
+      if(m1){
+        const mon=months[m1[1].toLowerCase()];
+        if(mon) return m1[2]+"-"+mon;
       }
-    } else {
-      d=new Date(v);
+      // 2025-Jan
+      const m2=v.match(/^(\d{4})[-\s]([A-Za-z]{3})$/);
+      if(m2){
+        const mon=months[m2[2].toLowerCase()];
+        if(mon) return m2[1]+"-"+mon;
+      }
+      // M/D/YYYY or MM/DD/YYYY
+      const m3=v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if(m3) return m3[3]+"-"+m3[1].padStart(2,"0");
+      // YYYY-MM or YYYY-MM-DD
+      const m4=v.match(/^(\d{4})-(\d{2})/);
+      if(m4) return m4[1]+"-"+m4[2];
     }
-  } else {
-    d=new Date(v);
-  }
-  if(!d||isNaN(d))return null;
-  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+    if(typeof v==="number"){
+      const d=new Date(Math.round((v-25569)*86400*1000));
+      if(!isNaN(d)) return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+    }
+    const d=new Date(v);
+    if(!isNaN(d)) return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+  }catch(e){}
+  return null;
 }
 function mlabel(ym){
   if(!ym)return"";
@@ -219,7 +231,7 @@ async function fetchSheet(id){
   const cols=json.table.cols.map(c=>c.label);
   return json.table.rows.map(r=>{
     const obj={};
-    cols.forEach((c,i)=>{obj[c]=r.c[i]?r.c[i].v:null;});
+    cols.forEach((c,i)=>{obj[c]=r.c[i]?(r.c[i].v!==null&&r.c[i].v!==undefined?r.c[i].v:null):null;});
     return obj;
   });
 }
@@ -238,12 +250,25 @@ async function loadAll(){
       DB.catMap[m]={desc:String(r["Material Description"]??"").trim(),category:String(r["Category"]??"").trim()};
       DB.catMaterials.add(m);
     });
-    DB.prices=pricesRaw.map(r=>({
-      material:String(r["Material"]??"").trim(),
-      ym:toYM(r["Date "]??r["Date"]),
-      price:parseFloat(r["Price"])||0,
-      supplier:String(r["Supplier"]??"").trim(),
-    })).filter(r=>r.material&&r.ym&&r.price>0&&DB.catMaterials.has(r.material));
+    // Log first row to debug
+    if(pricesRaw.length>0){
+      console.log("Prices columns:", Object.keys(pricesRaw[0]));
+      console.log("First row:", pricesRaw[0]);
+    }
+    if(catsRaw.length>0){
+      console.log("Categories columns:", Object.keys(catsRaw[0]));
+      console.log("First cat row:", catsRaw[0]);
+    }
+    DB.prices=pricesRaw.map(r=>{
+      // Try all possible column name variations
+      const mat=String(r["Material"]??r["material"]??r["MATERIAL"]??"").trim();
+      const dateVal=r["Date "]??r["Date"]??r["date"]??r["DATE"]??null;
+      const price=parseFloat(r["Price"]??r["price"]??r["PRICE"]??0)||0;
+      const sup=String(r["Supplier"]??r["supplier"]??r["SUPPLIER"]??r["Supplier/Supplying Plant"]??"").trim();
+      return{material:mat,ym:toYM(dateVal),price,supplier:sup};
+    }).filter(r=>r.material&&r.ym&&r.price>0&&DB.catMaterials.has(r.material));
+    console.log("Prices loaded:", DB.prices.length, "rows");
+    console.log("Categories loaded:", DB.catMaterials.size, "materials");
 
     const suppliers=[...new Set(DB.prices.map(r=>r.supplier))].sort();
     const categories=[...new Set(Object.values(DB.catMap).map(v=>v.category))].filter(Boolean).sort();
