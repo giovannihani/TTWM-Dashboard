@@ -14,8 +14,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;font-size:13px;background:#f0f2
 .login-card{background:#fff;border-radius:14px;padding:36px 32px;width:320px;border:1px solid #e0e0e0}
 .login-logo{text-align:center;margin-bottom:24px}
 .login-logo svg{display:block;margin:0 auto 10px}
-.login-logo .app-name{font-size:18px;font-weight:700;color:#222}
-.login-logo .app-sub{font-size:12px;color:#888;margin-top:2px}
+.app-name{font-size:18px;font-weight:700;color:#222}
+.app-sub{font-size:12px;color:#888;margin-top:2px}
 .login-card label{display:block;font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px}
 .login-card input{width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;margin-bottom:14px;color:#222}
 .login-card input:focus{border-color:#378ADD}
@@ -23,7 +23,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;font-size:13px;background:#f0f2
 .login-btn:hover{background:#2a6db5}
 .login-err{color:#D85A30;font-size:12px;text-align:center;margin-top:10px;min-height:16px}
 
-/* DASHBOARD */
+/* APP */
 #app{display:none}
 .topbar{background:#fff;border-bottom:1px solid #e0e0e0;padding:10px 20px;display:flex;align-items:center;justify-content:space-between}
 .topbar-title{font-size:15px;font-weight:700;color:#222}
@@ -51,7 +51,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;font-size:13px;background:#f0f2
 .cat-badge{font-size:11px;padding:4px 10px;border-radius:5px;background:#e8f0fe;color:#1a56db;font-weight:500;white-space:nowrap}
 
 /* GRID */
-.grid-top{display:grid;grid-template-columns:1.2fr 1fr;gap:14px;margin-bottom:14px}
+.grid-top{display:grid;grid-template-columns:1.3fr 1fr;gap:14px;margin-bottom:14px}
 .card{background:#fff;border-radius:10px;padding:16px;border:1px solid #e0e0e0}
 .card-title{font-size:12px;font-weight:600;color:#555;margin-bottom:14px}
 .chart-wrap{position:relative;width:100%;height:300px}
@@ -62,13 +62,11 @@ th{padding:8px 10px;text-align:left;font-weight:600;color:#666;border-bottom:2px
 th.r{text-align:right}
 td{padding:7px 10px;border-bottom:1px solid #f2f2f2;color:#333;vertical-align:middle}
 td.r{text-align:right;font-weight:500}
-td.mat{font-weight:600;font-size:11px;color:#555}
-td.desc{font-size:12px;color:#333}
 tr:hover td{background:#fafcff}
 tr.total td{font-weight:700;background:#f5f5f5;border-top:2px solid #ddd}
 .up{color:#D85A30}
 .dn{color:#1D9E75}
-.neu{color:#888}
+.neu{color:#aaa}
 
 /* KPIs */
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px}
@@ -79,6 +77,13 @@ tr.total td{font-weight:700;background:#f5f5f5;border-top:2px solid #ddd}
 
 .loading{text-align:center;padding:4rem;color:#888}
 .empty{text-align:center;padding:2rem;color:#aaa;font-size:12px}
+
+/* Legend */
+.legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:#555}
+.legend-dot{width:12px;height:12px;border-radius:2px;flex-shrink:0}
+
+@media(max-width:700px){.grid-top{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -111,7 +116,6 @@ tr.total td{font-weight:700;background:#f5f5f5;border-top:2px solid #ddd}
     </div>
   </div>
 
-  <!-- FILTERS -->
   <div class="filters">
     <div class="fg">
       <label>Supplier</label>
@@ -132,7 +136,7 @@ tr.total td{font-weight:700;background:#f5f5f5;border-top:2px solid #ddd}
   </div>
 
   <div class="content">
-    <div id="root"><div class="loading">Loading data...</div></div>
+    <div id="root"><div class="loading">Loading data from Google Sheets...</div></div>
   </div>
 </div>
 
@@ -172,7 +176,7 @@ const SHEETS = {
   prices: "14UQ7jkJ8Iwf164nVpofCJBzFGDjbJRou",
   categories: "1ieNsiHChGmlhxfmHzJxo49armHCC1NEe",
 };
-const COLORS = ["#4472C4","#ED7D31","#A5A5A5","#FFC000","#5B9BD5","#70AD47","#FF0000"];
+const COLORS = ["#4472C4","#ED7D31","#A5A5A5","#FFC000","#5B9BD5","#70AD47","#FF6B6B"];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function toYM(v) {
@@ -190,11 +194,12 @@ function mlabel(ym) {
 }
 function shortSup(s) {
   if (!s) return "—";
-  const p = s.split("   ");
-  return p.length > 1 ? p[1].trim() : s.trim();
+  // Handle "20200155   Ningbo Bueno..." format
+  const p = s.trim().split(/\s{2,}/);
+  return p.length > 1 ? p[p.length - 1].trim() : s.trim();
 }
-function avg(arr) {
-  if (!arr.length) return null;
+function avgArr(arr) {
+  if (!arr || !arr.length) return null;
   return arr.reduce((a, b) => a + b, 0) / arr.length;
 }
 
@@ -212,7 +217,7 @@ async function fetchSheet(id) {
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let DB = { prices: [], catMap: {} };
+let DB = { prices: [], catMap: {}, catMaterials: new Set() };
 let filtered = [];
 let selMat = "";
 
@@ -225,25 +230,33 @@ async function loadAll() {
       fetchSheet(SHEETS.categories),
     ]);
 
-    // Parse prices
+    // ── Categories = MASTER LIST ──────────────────────────────────────────────
+    DB.catMap = {};
+    DB.catMaterials = new Set();
+    catsRaw.forEach(r => {
+      const m = String(r["Material"] ?? "").trim();
+      if (!m) return;
+      DB.catMap[m] = {
+        desc: String(r["Material Description"] ?? "").trim(),
+        category: String(r["Category"] ?? "").trim(),
+      };
+      DB.catMaterials.add(m);
+    });
+
+    // ── Prices — ONLY materials that exist in Categories ─────────────────────
     DB.prices = pricesRaw.map(r => ({
       material: String(r["Material"] ?? "").trim(),
       ym: toYM(r["Date "] ?? r["Date"]),
       price: parseFloat(r["Price"]) || 0,
       supplier: String(r["Supplier"] ?? "").trim(),
-    })).filter(r => r.material && r.ym && r.price > 0);
+    })).filter(r =>
+      r.material &&
+      r.ym &&
+      r.price > 0 &&
+      DB.catMaterials.has(r.material)   // ← MASTER FILTER
+    );
 
-    // Parse categories — key by material
-    DB.catMap = {};
-    catsRaw.forEach(r => {
-      const m = String(r["Material"] ?? "").trim();
-      if (m) DB.catMap[m] = {
-        desc: String(r["Material Description"] ?? "").trim(),
-        category: String(r["Category"] ?? "").trim(),
-      };
-    });
-
-    // Populate filter dropdowns
+    // ── Populate filters ──────────────────────────────────────────────────────
     const suppliers = [...new Set(DB.prices.map(r => r.supplier))].sort();
     const categories = [...new Set(Object.values(DB.catMap).map(v => v.category))].filter(Boolean).sort();
     const months = DB.prices.map(r => r.ym).filter(Boolean).sort();
@@ -285,12 +298,8 @@ function applyFilters() {
     return true;
   });
 
-  // Get all materials in filtered data
   const mats = [...new Set(filtered.map(r => r.material))].sort();
-
-  // Keep selected material if still valid, else pick first
   if (!selMat || !mats.includes(selMat)) selMat = mats[0] || "";
-
   render(mats);
 }
 
@@ -302,51 +311,71 @@ function render(mats) {
   }
 
   const allMonths = [...new Set(filtered.map(r => r.ym))].sort();
-  const allSuppliers = [...new Set(filtered.map(r => r.supplier))].sort();
-
-  // Data for selected material only
-  const matRows = filtered.filter(r => r.material === selMat);
-  const matSuppliers = [...new Set(matRows.map(r => r.supplier))].sort();
-  const matMonths = [...new Set(matRows.map(r => r.ym))].sort();
-
-  // Current vs previous month
   const curM = allMonths[allMonths.length - 1];
   const preM = allMonths[allMonths.length - 2] || null;
 
-  // Bottom table — all materials, current vs prev
-  const tableRows = mats.map(mat => {
-    const cur = filtered.filter(r => r.material === mat && r.ym === curM);
-    const pre = filtered.filter(r => r.material === mat && r.ym === preM);
-    if (!cur.length) return null;
-    const cAvg = avg(cur.map(r => r.price));
-    const pAvg = pre.length ? avg(pre.map(r => r.price)) : null;
-    const diff = pAvg !== null ? cAvg - pAvg : null;
-    const pct = pAvg ? ((cAvg - pAvg) / pAvg) * 100 : null;
-    return { mat, cAvg, pAvg, diff, pct };
-  }).filter(Boolean);
+  // ── Selected material data ────────────────────────────────────────────────
+  const matRows = filtered.filter(r => r.material === selMat);
+  const matMonths = [...new Set(matRows.map(r => r.ym))].sort();
 
-  const tCur = avg(tableRows.map(r => r.cAvg));
-  const tPre = avg(tableRows.filter(r => r.pAvg !== null).map(r => r.pAvg));
-  const tDiff = tCur !== null && tPre !== null ? tCur - tPre : null;
-  const tPct = tPre ? ((tCur - tPre) / tPre) * 100 : null;
+  // ALL suppliers in the full prices sheet for this material (not filtered by supplier)
+  const allSupForMat = [...new Set(
+    DB.prices.filter(r => r.material === selMat).map(r => r.supplier)
+  )].sort();
 
-  // Chart datasets for selected material
-  const datasets = matSuppliers.map((sup, i) => {
+  // ── Chart datasets — one line per supplier ────────────────────────────────
+  const datasets = allSupForMat.map((sup, i) => {
     const bm = {};
-    matRows.filter(r => r.supplier === sup).forEach(r => { bm[r.ym] = r.price; });
+    DB.prices
+      .filter(r => r.material === selMat && r.supplier === sup)
+      .filter(r => {
+        const from = document.getElementById("f-from").value;
+        const to = document.getElementById("f-to").value;
+        if (from && r.ym < from) return false;
+        if (to && r.ym > to) return false;
+        return true;
+      })
+      .forEach(r => { bm[r.ym] = r.price; });
+
     return {
       label: shortSup(sup),
       data: matMonths.map(m => bm[m] ?? null),
       borderColor: COLORS[i % COLORS.length],
       backgroundColor: COLORS[i % COLORS.length] + "22",
-      tension: 0.3, spanGaps: true, pointRadius: 5, fill: false,
+      tension: 0.3,
+      spanGaps: true,
+      pointRadius: 5,
+      pointHoverRadius: 7,
+      fill: false,
+      borderWidth: 2,
     };
   });
 
-  // Latest price for selected material
-  const latestRow = [...matRows].sort((a, b) => b.ym.localeCompare(a.ym))[0];
-  const latestPrice = latestRow ? latestRow.price : null;
-  const latestSup = latestRow ? shortSup(latestRow.supplier) : "—";
+  // ── Supplier comparison table (right) ─────────────────────────────────────
+  const supTableMonths = [...new Set(
+    DB.prices.filter(r => r.material === selMat).map(r => r.ym)
+  )].sort().reverse();
+
+  // ── Bottom table — all materials current vs previous ──────────────────────
+  const tableRows = mats.map(mat => {
+    const cur = filtered.filter(r => r.material === mat && r.ym === curM);
+    const pre = filtered.filter(r => r.material === mat && r.ym === preM);
+    if (!cur.length) return null;
+    const cAvg = avgArr(cur.map(r => r.price));
+    const pAvg = pre.length ? avgArr(pre.map(r => r.price)) : null;
+    const diff = pAvg !== null ? cAvg - pAvg : null;
+    const pct = pAvg ? ((cAvg - pAvg) / pAvg) * 100 : null;
+    return { mat, cAvg, pAvg, diff, pct };
+  }).filter(Boolean);
+
+  const tCur = avgArr(tableRows.map(r => r.cAvg));
+  const tPre = avgArr(tableRows.filter(r => r.pAvg !== null).map(r => r.pAvg));
+  const tDiff = tCur !== null && tPre !== null ? tCur - tPre : null;
+  const tPct = tPre ? ((tCur - tPre) / tPre) * 100 : null;
+
+  // ── KPIs ──────────────────────────────────────────────────────────────────
+  const latestRow = [...DB.prices.filter(r => r.material === selMat)].sort((a, b) => b.ym.localeCompare(a.ym))[0];
+  const matPct = tableRows.find(r => r.mat === selMat);
   const catInfo = DB.catMap[selMat];
 
   document.getElementById("root").innerHTML = `
@@ -367,13 +396,13 @@ function render(mats) {
     <div class="kpis">
       <div class="kpi">
         <div class="kpi-label">Latest price</div>
-        <div class="kpi-value">${latestPrice !== null ? "$" + latestPrice.toFixed(4) : "—"}</div>
-        <div class="kpi-sub">${latestRow ? mlabel(latestRow.ym) + " · " + latestSup : ""}</div>
+        <div class="kpi-value">${latestRow ? "$" + latestRow.price.toFixed(4) : "—"}</div>
+        <div class="kpi-sub">${latestRow ? mlabel(latestRow.ym) + " · " + shortSup(latestRow.supplier) : ""}</div>
       </div>
       <div class="kpi">
         <div class="kpi-label">Suppliers</div>
-        <div class="kpi-value">${matSuppliers.length}</div>
-        <div class="kpi-sub">for this material</div>
+        <div class="kpi-value">${allSupForMat.length}</div>
+        <div class="kpi-sub">${allSupForMat.map(s => shortSup(s)).join(", ")}</div>
       </div>
       <div class="kpi">
         <div class="kpi-label">Months tracked</div>
@@ -382,36 +411,40 @@ function render(mats) {
       </div>
       <div class="kpi">
         <div class="kpi-label">vs last month</div>
-        <div class="kpi-value ${(() => { const r = tableRows.find(r => r.mat === selMat); return r && r.diff !== null ? r.diff > 0 ? "up" : "dn" : ""; })()}">
-          ${(() => {
-            const r = tableRows.find(r => r.mat === selMat);
-            if (!r || r.pct === null) return "—";
-            return (r.pct >= 0 ? "▲ +" : "▼ ") + r.pct.toFixed(2) + "%";
-          })()}
+        <div class="kpi-value ${matPct && matPct.pct !== null ? matPct.pct > 0 ? "up" : "dn" : "neu"}">
+          ${matPct && matPct.pct !== null
+            ? (matPct.pct >= 0 ? "▲ +" : "▼ ") + matPct.pct.toFixed(2) + "%"
+            : "—"}
         </div>
         <div class="kpi-sub">price change</div>
       </div>
     </div>
 
-    <!-- Chart + supplier table -->
+    <!-- Chart + Supplier table -->
     <div class="grid-top">
       <div class="card">
-        <div class="card-title">Price trend by supplier — ${catInfo ? catInfo.desc : selMat}</div>
-        <div class="chart-wrap"><canvas id="lineChart" role="img" aria-label="Price trend chart"></canvas></div>
+        <div class="card-title">Price comparison by supplier — ${catInfo ? catInfo.desc : selMat}</div>
+        <div class="chart-wrap">
+          <canvas id="lineChart" role="img" aria-label="Supplier price comparison chart"></canvas>
+        </div>
+        <div class="legend" id="chart-legend"></div>
       </div>
+
       <div class="card" style="overflow-x:auto">
-        <div class="card-title">Supplier price comparison — latest per month</div>
+        <div class="card-title">Price per supplier per month</div>
         <table>
           <thead><tr>
             <th>Month</th>
-            ${matSuppliers.map(s => `<th class="r">${shortSup(s)}</th>`).join("")}
+            ${allSupForMat.map(s => `<th class="r">${shortSup(s)}</th>`).join("")}
           </tr></thead>
           <tbody>
-            ${matMonths.slice().reverse().map(m => `<tr>
+            ${supTableMonths.map(m => `<tr>
               <td>${mlabel(m)}</td>
-              ${matSuppliers.map(s => {
-                const row = matRows.find(r => r.supplier === s && r.ym === m);
-                return `<td class="r">${row ? "$" + row.price.toFixed(4) : "—"}</td>`;
+              ${allSupForMat.map((s, i) => {
+                const row = DB.prices.find(r => r.material === selMat && r.supplier === s && r.ym === m);
+                return `<td class="r" style="color:${row ? COLORS[i % COLORS.length] : "#ccc"}">
+                  ${row ? "$" + row.price.toFixed(4) : "—"}
+                </td>`;
               }).join("")}
             </tr>`).join("")}
           </tbody>
@@ -419,10 +452,10 @@ function render(mats) {
       </div>
     </div>
 
-    <!-- Current vs Previous month table -->
+    <!-- All materials table -->
     <div class="card" style="overflow-x:auto">
       <div class="card-title">
-        All materials — Current month (${mlabel(curM)}) vs Previous month (${mlabel(preM) || "—"})
+        All materials — ${mlabel(curM)} vs ${mlabel(preM) || "previous month"}
       </div>
       <table>
         <thead><tr>
@@ -439,9 +472,10 @@ function render(mats) {
             const info = DB.catMap[r.mat];
             const cls = r.diff === null ? "neu" : r.diff > 0 ? "up" : "dn";
             const arrow = r.diff === null ? "" : r.diff > 0 ? "▲ " : "▼ ";
-            return `<tr>
-              <td class="mat">${r.mat}</td>
-              <td class="desc">${info ? info.desc : "—"}</td>
+            const isSelected = r.mat === selMat;
+            return `<tr style="${isSelected ? "background:#f0f7ff;" : ""}" onclick="selMat='${r.mat}';render(${JSON.stringify(mats)})" style="cursor:pointer">
+              <td style="font-weight:600;font-size:11px;color:#555">${r.mat}</td>
+              <td>${info ? info.desc : "—"}</td>
               <td><span class="cat-badge">${info ? info.category : "—"}</span></td>
               <td class="r">$${r.cAvg.toFixed(4)}</td>
               <td class="r">${r.pAvg !== null ? "$" + r.pAvg.toFixed(4) : "—"}</td>
@@ -461,7 +495,7 @@ function render(mats) {
     </div>
   `;
 
-  // Draw chart
+  // ── Draw chart ────────────────────────────────────────────────────────────
   setTimeout(() => {
     const ctx = document.getElementById("lineChart");
     if (!ctx) return;
@@ -470,14 +504,36 @@ function render(mats) {
       type: "line",
       data: { labels: matMonths.map(mlabel), datasets },
       options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } } },
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => ` ${ctx.dataset.label}: $${ctx.parsed.y?.toFixed(4) ?? "—"}`
+            }
+          }
+        },
         scales: {
           x: { ticks: { autoSkip: false, maxRotation: 45, font: { size: 10 } } },
           y: { ticks: { callback: v => "$" + v.toFixed(4), font: { size: 10 } } },
         },
+        onClick: (e, els) => {
+          // click chart to switch supplier filter
+        }
       }
     });
+
+    // Custom legend
+    const leg = document.getElementById("chart-legend");
+    if (leg) {
+      leg.innerHTML = allSupForMat.map((s, i) =>
+        `<div class="legend-item">
+          <div class="legend-dot" style="background:${COLORS[i % COLORS.length]}"></div>
+          ${shortSup(s)}
+        </div>`
+      ).join("");
+    }
   }, 50);
 }
 
